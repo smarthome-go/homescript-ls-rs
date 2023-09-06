@@ -54,17 +54,33 @@ impl Backend {
     async fn create_diagnostics(&self, params: TextDocumentItem) {
         let raw_diagnostics = match self
             .smarthome_client
-            .exec_homescript_code(&params.text, vec![], HmsRunMode::Lint)
+            .exec_homescript_code(&params.text, vec![], HmsRunMode::Execute)
             .await
         {
             Ok(res) => res.errors,
             Err(err) => panic!("{err}"),
         };
 
-        // transform the diagnostics into the LSP form
+        // transform the errors / diagnostics into the LSP form
         let diagnostics = raw_diagnostics
             .iter()
             .map(|diagnostic| {
+                let (message, level) = match (&diagnostic.syntax_error, &diagnostic.diagnostic_error)
+                {
+                    (Some(syntax), None) => (syntax.message.clone(), DiagnosticSeverity::ERROR),
+                    (None, Some(diagnostic)) => (
+                        diagnostic.message.clone(),
+                        match diagnostic.kind {
+                            0 => DiagnosticSeverity::HINT,
+                            1 => DiagnosticSeverity::INFORMATION,
+                            2 => DiagnosticSeverity::WARNING,
+                            3 => DiagnosticSeverity::ERROR,
+                            _ => unreachable!("Illegal kind"),
+                        },
+                    ),
+                    _ => unreachable!("Illegal state"),
+                };
+
                 Diagnostic::new(
                     Range::new(
                         Position::new(
@@ -76,14 +92,10 @@ impl Backend {
                             (diagnostic.span.end.column) as u32,
                         ),
                     ),
-                    Some(match diagnostic.kind.as_str() {
-                        "Info" => DiagnosticSeverity::INFORMATION,
-                        "Warning" => DiagnosticSeverity::WARNING,
-                        _ => DiagnosticSeverity::ERROR,
-                    }),
+                    Some(level),
                     None,
                     Some("homescript-analyzer".to_string()),
-                    format!("{}: {}", diagnostic.kind, diagnostic.message.to_string()),
+                    message,
                     None,
                     None,
                 )
