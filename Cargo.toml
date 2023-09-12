@@ -8,11 +8,11 @@ repository = "https://github.com/smarthome-go/homescript-ls-rs"
 
 [dependencies]
 anyhow = "1.0.71"
-clap = { version = "4.3.0", features = ["derive"] }
-log = "0.4.17"
+clap = { version = "4.3.4", features = ["derive"] }
+log = "0.4.19"
 loggerv = "0.7.2"
-serde = "1.0.163"
-smarthome-sdk-rs = "0.10.0"
-tokio = { version = "1.28.1", features = ["macros", "rt-multi-thread", "io-std"] }
+serde = "1.0.164"
+smarthome-sdk-rs = { path = "../sdk-rs/"}
+tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread", "io-std"] }
 toml = "0.7.4"
-tower-lsp = "0.19.0"
+tower-lsp = "0.20.0"
