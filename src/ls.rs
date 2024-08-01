@@ -54,7 +54,13 @@ impl Backend {
     async fn create_diagnostics(&self, params: TextDocumentItem) {
         let raw_diagnostics = match self
             .smarthome_client
-            .exec_homescript_code(&params.text, vec![], HmsRunMode::Execute)
+            .exec_homescript_code(
+                &params.text,
+                vec![],
+                HmsRunMode::Lint {
+                    module_name: params.uri.to_string().as_str(),
+                },
+            )
             .await
         {
             Ok(res) => res.errors,
@@ -65,21 +71,21 @@ impl Backend {
         let diagnostics = raw_diagnostics
             .iter()
             .map(|diagnostic| {
-                let (message, level) = match (&diagnostic.syntax_error, &diagnostic.diagnostic_error)
-                {
-                    (Some(syntax), None) => (syntax.message.clone(), DiagnosticSeverity::ERROR),
-                    (None, Some(diagnostic)) => (
-                        diagnostic.message.clone(),
-                        match diagnostic.kind {
-                            0 => DiagnosticSeverity::HINT,
-                            1 => DiagnosticSeverity::INFORMATION,
-                            2 => DiagnosticSeverity::WARNING,
-                            3 => DiagnosticSeverity::ERROR,
-                            _ => unreachable!("Illegal kind"),
-                        },
-                    ),
-                    _ => unreachable!("Illegal state"),
-                };
+                let (message, level) =
+                    match (&diagnostic.syntax_error, &diagnostic.diagnostic_error) {
+                        (Some(syntax), None) => (syntax.message.clone(), DiagnosticSeverity::ERROR),
+                        (None, Some(diagnostic)) => (
+                            diagnostic.message.clone(),
+                            match diagnostic.kind {
+                                0 => DiagnosticSeverity::HINT,
+                                1 => DiagnosticSeverity::INFORMATION,
+                                2 => DiagnosticSeverity::WARNING,
+                                3 => DiagnosticSeverity::ERROR,
+                                _ => unreachable!("Illegal kind"),
+                            },
+                        ),
+                        _ => unreachable!("Illegal state"),
+                    };
 
                 Diagnostic::new(
                     Range::new(

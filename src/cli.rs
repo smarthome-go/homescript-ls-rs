@@ -14,4 +14,8 @@ pub struct Args {
     /// If set, more information will be printed to the console
     #[clap(short, long, value_parser, global = true)]
     pub verbose: bool,
+
+    /// If set, no version check is being performed during a connection attempt.
+    #[clap(short, long, value_parser, global = true)]
+    pub no_version_check: bool,
 }

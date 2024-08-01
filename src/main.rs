@@ -59,13 +59,18 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Create a Smarthome client
-    let smarthome_client =
-        match Client::new(&profile.url, Auth::QueryToken(profile.token.clone())).await {
-            Ok(client) => client,
-            Err(err) => {
-                bail!("Could not connect to Smarthome: {err}");
-            }
-        };
+    let smarthome_client = match Client::new(
+        &profile.url,
+        Auth::QueryToken(profile.token.clone()),
+        !args.no_version_check,
+    )
+    .await
+    {
+        Ok(client) => client,
+        Err(err) => {
+            bail!("Could not connect to Smarthome: {err}");
+        }
+    };
 
     ls::start_service(smarthome_client).await;
     Ok(())
