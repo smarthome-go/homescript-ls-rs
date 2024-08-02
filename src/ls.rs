@@ -1,4 +1,7 @@
+use anyhow::{bail, Context};
+use serde::Deserialize;
 use smarthome_sdk_rs::HmsRunMode;
+use std::fs;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
@@ -6,7 +9,16 @@ use tower_lsp::{Client, LanguageServer, LspService, Server};
 struct Backend {
     client: Client,
     smarthome_client: smarthome_sdk_rs::Client,
+    // workspace_context: Arc<Mutex<RefCell<HomescriptMetadata>>>,
 }
+
+#[derive(Deserialize, Debug)]
+pub struct HomescriptMetadata {
+    pub id: String,
+    pub is_driver: bool,
+}
+
+const WORKSPACE_TOML_NAME: &str = ".hms.toml";
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
@@ -31,7 +43,7 @@ impl LanguageServer for Backend {
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         self.create_diagnostics(TextDocumentItem {
-            language_id: "rush".to_string(),
+            language_id: "homescript".to_string(),
             uri: params.text_document.uri,
             text: params.text_document.text,
             version: params.text_document.version,
@@ -41,7 +53,7 @@ impl LanguageServer for Backend {
 
     async fn did_change(&self, mut params: DidChangeTextDocumentParams) {
         self.create_diagnostics(TextDocumentItem {
-            language_id: "rush".to_string(),
+            language_id: "homescript".to_string(),
             uri: params.text_document.uri,
             version: params.text_document.version,
             text: std::mem::take(&mut params.content_changes[0].text),
@@ -51,14 +63,62 @@ impl LanguageServer for Backend {
 }
 
 impl Backend {
+    fn try_read_workspace_toml_unwrapped(
+        &self,
+        file_path: Url,
+    ) -> anyhow::Result<HomescriptMetadata> {
+        let Ok(file_path) = file_path.to_file_path() else {
+            bail!("invalid document file path");
+        };
+
+        let mut workspace_toml_path = file_path;
+        workspace_toml_path.set_file_name(WORKSPACE_TOML_NAME);
+
+        let workspace_toml_str = fs::read_to_string(workspace_toml_path)
+            .with_context(|| format!("read {WORKSPACE_TOML_NAME}"))?;
+
+        let manifest: HomescriptMetadata = toml::from_str(&workspace_toml_str)
+            .with_context(|| format!("invalid workspace file {WORKSPACE_TOML_NAME}"))?;
+
+        Ok(manifest)
+    }
+
+    async fn send_error(&self, uri: Url, message: String) {
+        self.client
+            .publish_diagnostics(
+                uri,
+                vec![Diagnostic::new(
+                    Range::new(Position::new(0, 0), Position::new(0, 0)),
+                    Some(DiagnosticSeverity::ERROR),
+                    None,
+                    Some("homescript-analyzer".to_string()),
+                    message,
+                    None,
+                    None,
+                )],
+                None,
+            )
+            .await;
+    }
+
     async fn create_diagnostics(&self, params: TextDocumentItem) {
+        let ctx = match self.try_read_workspace_toml_unwrapped(params.uri.clone()) {
+            Ok(ctx) => ctx,
+            Err(err) => {
+                self.send_error(params.uri, format!("index workspace: {err}"))
+                    .await;
+                return;
+            }
+        };
+
         let raw_diagnostics = match self
             .smarthome_client
             .exec_homescript_code(
                 &params.text,
                 vec![],
                 HmsRunMode::Lint {
-                    module_name: params.uri.to_string().as_str(),
+                    module_name: &ctx.id,
+                    is_driver: ctx.is_driver,
                 },
             )
             .await
@@ -122,5 +182,6 @@ pub async fn start_service(smarthome_client: smarthome_sdk_rs::Client) {
         client: lsp_client,
         smarthome_client,
     });
+
     Server::new(stdin, stdout, socket).serve(service).await;
 }
