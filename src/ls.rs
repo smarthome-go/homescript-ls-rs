@@ -105,9 +105,13 @@ impl Backend {
         let ctx = match self.try_read_workspace_toml_unwrapped(params.uri.clone()) {
             Ok(ctx) => ctx,
             Err(err) => {
-                self.send_error(params.uri, format!("index workspace: {err}"))
+                self.send_error(params.uri.clone(), format!("index workspace: {err}"))
                     .await;
-                return;
+
+                HomescriptMetadata {
+                    id: "unknown".into(),
+                    is_driver: false,
+                }
             }
         };
 

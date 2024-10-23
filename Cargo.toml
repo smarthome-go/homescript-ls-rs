@@ -7,12 +7,12 @@ repository = "https://github.com/smarthome-go/homescript-ls-rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.71"
-clap = { version = "4.3.4", features = ["derive"] }
-log = "0.4.19"
+anyhow = "1.0.91"
+clap = { version = "4.5.20", features = ["derive"] }
+log = "0.4.22"
 loggerv = "0.7.2"
-serde = "1.0.164"
-smarthome-sdk-rs = { path = "../sdk-rs/"}
-tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread", "io-std"] }
-toml = "0.7.4"
+serde = "1.0.213"
+smarthome-sdk-rs = { version = "0.13.0" }
+tokio = { version = "1.41.0", features = ["macros", "rt-multi-thread", "io-std"] }
+toml = "0.8.19"
 tower-lsp = "0.20.0"
