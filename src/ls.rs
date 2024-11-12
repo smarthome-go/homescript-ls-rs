@@ -128,7 +128,11 @@ impl Backend {
             .await
         {
             Ok(res) => res.errors,
-            Err(err) => panic!("{err}"),
+            Err(err) => {
+                self.send_error(params.uri.clone(), format!("analyze program: {err}"))
+                    .await;
+                return;
+            }
         };
 
         // transform the errors / diagnostics into the LSP form
